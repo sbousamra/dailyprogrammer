@@ -1,0 +1,5 @@
+Battery Voltage (V) = 9
+Battery Capacity (mAh) = 1200
+LED voltage requirement (V) = 1.7
+LED current requirement (mA) = 20
+Time requirement (hours) = 20	

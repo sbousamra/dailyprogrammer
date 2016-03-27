@@ -1,0 +1,4 @@
+chat.freenode.net:6667
+Nickname
+Username
+Real Name
