@@ -1,0 +1,8 @@
+button_clicked
+cycle_complete
+button_clicked
+button_clicked
+button_clicked
+button_clicked
+button_clicked
+cycle_complete

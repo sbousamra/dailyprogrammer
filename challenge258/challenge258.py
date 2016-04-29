@@ -15,13 +15,22 @@ class IRCClient:
 		self.sock.send(("NICK " + self.nickname + "\r\n").encode())
 		self.sock.send(("USER " + self.username + " 0 * :" + self.realname + "\r\n").encode())
 
+	def messaging(self):
+		initialInput = input("What input would u like?")
+		initialInput
+		self.sock.send((initialInput + "\r\n").encode())
+		# self.sock.send(("PRIVMSG " + self.messagechannel + " " + self.message + "\r\n").encode())
+
 	def receive(self):
 		while True:
 			messages = self.sock.recv(8000).decode()
-			time.sleep(0.2)
+			self.sock.settimeout(20)
 			print(messages)
 
 
 messageclient = IRCClient("chat.freenode.net", 6667, "bassleb", "bassdogga", "Sebastian")
-messageclient.connect()
-messageclient.receive()
+
+while True:
+	messageclient.connect()
+	messageclient.messaging()
+	messageclient.receive()
