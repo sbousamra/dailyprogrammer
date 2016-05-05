@@ -142,18 +142,18 @@ class Emulator:
 	def _8XY4(self, rawopcode):
 		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] + self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
 		if self.v[(rawopcode & 0x00f0) >> 4] > self.v[(rawopcode & 0x0f00) >> 8]:
-			self.vf = 1
+			self.v[0xf] = 1
 
 		else:
-			self.vf = 0
+			self.v[0xf] = 0
 
 	def _8XY5(self, rawopcode):
 		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] - self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
 		if self.v[(rawopcode & 0x00f0) >> 4] > self.v[(rawopcode & 0x0f00) >> 8]:
-			self.vf = 0
+			self.v[0xf] = 0
 
 		else:
-			self.vf = 1
+			self.v[0xf] = 1
 
 	def _ANNN(self, rawopcode):
 		self.i = (rawopcode & 0x0fff) & 0xffff
@@ -163,16 +163,18 @@ class Emulator:
 		print(self.display.asString())
 		input("")
 		height = rawopcode & 0x000f
-		xcoordinate = self.v[(rawopcode & 0x0f00) >> 8]
-		ycoordinate = self.v[(rawopcode & 0x00f0) >> 4]
+		xcoordinate = self.v[(rawopcode & 0x0f00) >> 8] % 65
+		ycoordinate = self.v[(rawopcode & 0x00f0) >> 4] % 33
+		self.v[0xf] = 0
 		for yoffset in range(0, height):
 			sprite = self.memory[yoffset + self.i]
 			for xoffset in range(0, 8):
 				bit = (sprite >> 7 - xoffset) & 1
 				xpixelpos = xcoordinate + xoffset
 				ypixelpos = ycoordinate + yoffset
-				print(str(ycoordinate) + " " + str(xpixelpos) + " " + str(ypixelpos))
 				bitfromscreen = self.display.getCoordinate(xpixelpos, ypixelpos)
+				if (bit ^ bitfromscreen) is True:
+					self.v[0xf] = 1
 				self.display.setCoordinate(xpixelpos, ypixelpos, bit ^ bitfromscreen)
 
 		self.programcounter = self.programcounter + 2
