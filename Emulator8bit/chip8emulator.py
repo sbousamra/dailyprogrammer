@@ -64,6 +64,7 @@ class Emulator:
 
 	def _00E0(self): #Clears the screen
 		self.display = [0]*64*32
+		self.programcounter += 2
 
 	def _00EE(self): #Returns from a subroutine
 		self.programcounter = self.stack[self.stackpointer]
@@ -72,13 +73,11 @@ class Emulator:
 
 	def _1NNN(self, rawopcode): #Jumps to the address NNN
 		self.programcounter = (rawopcode & 0x0fff)
-		self.programcounter += 2
 
 	def _2NNN(self, rawopcode):
 		self.stackpointer += 1
 		self.stack[self.stackpointer] = self.programcounter
 		self.programcounter = (rawopcode & 0x0fff)
-		self.programcounter += 2
 
 	def _3XKK(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
@@ -109,11 +108,7 @@ class Emulator:
 
 	def _7XKK(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
-		temporary = self.v[target] + (rawopcode & 0x00ff)
-		if temporary < 256:
-			self.v[target] = temporary
-		else:
-			temporary - 256
+		self.v[target] = (self.v[target] + (rawopcode & 0x00ff)) & 0xff
 		self.programcounter += 2
 
 	def _8XYN(self, rawopcode): #used to correctly identify which 8 opcode is being used
@@ -180,7 +175,7 @@ class Emulator:
 			self.v[0xf] = 1
 		else:
 			self.v[0xf] = 0
-		self.v[target] = temporary - (temporary & 255)
+		self.v[target] = temporary & 0xff
 		self.programcounter += 2
 
 	def _8XY5(self, rawopcode):
@@ -192,7 +187,7 @@ class Emulator:
 			self.v[0xf] = 1
 		else:
 			self.v[0xf] = 0
-		self.v[target] = self.v[source] - self.v[target]
+		self.v[target] -= self.v[source] & 0xff
 		self.programcounter += 2
 
 	def _9XY0(self, rawopcode):
@@ -231,6 +226,7 @@ class Emulator:
 	def _CXKK(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
 		self.v[target] = ((random.randint(1,255)) & (rawopcode & 0x00ff))
+		self.programcounter += 2
 
 	def _F000(self, rawopcode):
 
@@ -261,7 +257,7 @@ class Emulator:
 
 	def _FX1E(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
-		self.i += self.v[source]
+		self.i += self.v[source] & 0xffff
 		self.programcounter += 2
 
 	def _FX15(self, rawopcode):
