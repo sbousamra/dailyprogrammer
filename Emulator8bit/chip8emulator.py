@@ -1,33 +1,41 @@
 import sys
 import random
+import time
+import pygame
 
 class Screen:
-	def __init__(self, width, height):
+	def __init__(self, color, width, height, scalingFactor):
+		self.color = color
 		self.width = width
 		self.height = height
 		self.data = [[0]*width for y in range(height)]
+		self.scalingFactor = scalingFactor
 
-	def asString(self):
-		emptystring = ""
-		for row in self.data:
-			emptystring = emptystring + str(row) + "\n"
-		return emptystring
+	def drawImage(self, x, y, rawopcode):
+		mainSurface = pygame.display.set_mode((self.width * self.scalingFactor,self.height * self.scalingFactor))
+		imageLength = 8 #chip8 pixel length is fixed at 8 pixels
+		imageHeight = (rawopcode & 0x000f) & 0xffff #chip8 pixel height can range from 1 to 15 pixels
+		mainImage = pygame.draw.rect(mainSurface, self.color, (x * self.scalingFactor, y * self.scalingFactor, imageLength * self.scalingFactor, imageHeight * self.scalingFactor))
 
+		for i in range(0, len(self.data)):
+			for z in range (0, len(self.data[i])):
+				if self.data[i][z] == 1:
+					mainImage
+		pygame.display.flip()
+		
 	def setCoordinate(self, x, y, draw):
 		self.data[y][x] = draw
 
 	def getCoordinate(self, x, y):
 		return self.data[y][x]
-
+  
 class Emulator:
 	def __init__(self):
-		self.hasexit = 0
 		self.keyinput = [0]*16 #keyboard input 16-button keyboard
-		self.display = Screen(64,32)
+		self.display = Screen((255,255,255),64,32, 20)
 		self.memory = [0]*4096 #memory of interpreter, fonts and rom details
-		self.stack = []
+		self.stack = [0]*16
 		self.stackpointer = 0
-		# self.registers = [0]*16
 		self.soundtimer = 0
 		self.delaytimer = 0
 		self.programcounter = 0x200
@@ -39,8 +47,9 @@ class Emulator:
 		
 		i = 0
 		while i < len(loadedrom):
-			self.memory[i + 0x200] = loadedrom[i] #put rom input into memory
+			self.memory[0x200 + i] = loadedrom[i] #put rom input into memory
 			i += 1
+		print(self.memory)
 
 	def _0NNN(self, rawopcode): #used to correctly identify which 0 opcode is being used
 		decodedopcode = (rawopcode & 0xf0ff)
@@ -57,43 +66,55 @@ class Emulator:
 		self.display = [0]*64*32
 
 	def _00EE(self): #Returns from a subroutine
-		self.programcounter = self.stack.pop()
-		self.stackpointer = self.stackpointer - 1
-		self.programcounter = self.programcounter + 2
+		self.programcounter = self.stack[self.stackpointer]
+		self.stackpointer -= 1
+		self.programcounter += 2
 
 	def _1NNN(self, rawopcode): #Jumps to the address NNN
-		self.programcounter = (rawopcode & 0x0fff) & 0xffff
+		self.programcounter = (rawopcode & 0x0fff)
+		self.programcounter += 2
 
 	def _2NNN(self, rawopcode):
-		self.stackpointer = self.stackpointer + 1
-		self.stack.append(self.programcounter)  
-		self.programcounter = (rawopcode & 0x0fff) & 0xffff
+		self.stackpointer += 1
+		self.stack[self.stackpointer] = self.programcounter
+		self.programcounter = (rawopcode & 0x0fff)
+		self.programcounter += 2
 
 	def _3XKK(self, rawopcode):
-		if self.v[(rawopcode & 0x0f00) >> 8] == (rawopcode & 0x00ff):
+		source = (rawopcode & 0x0f00) >> 8
+		if self.v[source] == (rawopcode & 0x00ff):
 			self.programcounter += 4
 		else:
 			self.programcounter += 2
 
 	def _4XKK(self, rawopcode):
-		if self.v[(rawopcode & 0x0f00) >> 8] != (rawopcode & 0x00ff):
+		source = (rawopcode & 0x0f00) >> 8
+		if self.v[source] != (rawopcode & 0x00ff):
 			self.programcounter += 4
 		else:
-			self.programcounter +=2
+			self.programcounter += 2
 
-	def _5XY0(self):
-		if self.v[(rawopcode & 0x0f00) >> 8] == self.v[(rawopcode & 0x00f0) >> 4]:
+	def _5XY0(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		target = (rawopcode & 0x00f0) >> 4
+		if self.v[source] == self.v[target]:
 			self.programcounter += 4
 		else:
-			self.programcounter +=2
+			self.programcounter += 2
 
 	def _6XKK(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (rawopcode & 0x00ff) & 0xff
-		self.programcounter = self.programcounter + 2
+		target = (rawopcode & 0x0f00) >> 8
+		self.v[target] = (rawopcode & 0x00ff)
+		self.programcounter += 2
 
-	def _7XNN(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] + (rawopcode & 0x00ff)) & 0xff
-		self.programcounter = self.programcounter + 2
+	def _7XKK(self, rawopcode):
+		target = (rawopcode & 0x0f00) >> 8
+		temporary = self.v[target] + (rawopcode & 0x00ff)
+		if temporary < 256:
+			self.v[target] = temporary
+		else:
+			temporary - 256
+		self.programcounter += 2
 
 	def _8XYN(self, rawopcode): #used to correctly identify which 8 opcode is being used
 		decodedopcode = (rawopcode & 0xf00f)
@@ -119,7 +140,7 @@ class Emulator:
 			self._8XY6(rawopcode)
 
 		elif decodedopcode == 0x8007:
-			self._8XY6(rawopcode)
+			self._8XY7(rawopcode)
 
 		elif decodedopcode == 0x800e:
 			self._8XYE(rawopcode)
@@ -128,60 +149,91 @@ class Emulator:
 			print("Unknown _8XYN instruction " + hex(rawopcode))
 
 	def _8XY0(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = self.v[(rawopcode & 0x00f0) >> 4] & 0xff
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		self.v[target] = self.v[source]
+		self.programcounter += 2
 
 	def _8XY1(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] | self.v[(rawopcode & 0x00f0) >> 4]) & 0xff 
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		self.v[target] |= self.v[source]
+		self.programcounter += 2
 
 	def _8XY2(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] & self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		self.v[target] &= self.v[source]
+		self.programcounter += 2
 
 	def _8XY3(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] ^ self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		self.v[target] ^= self.v[source]
+		self.programcounter += 2
 
 	def _8XY4(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] + self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
-		if self.v[(rawopcode & 0x00f0) >> 4] > self.v[(rawopcode & 0x0f00) >> 8]:
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		temporary = self.v[target] + self.v[source]
+		if temporary > 255:
+			self.v[target] = temporary - 256
 			self.v[0xf] = 1
-
 		else:
+			self.v[target] = temporary
 			self.v[0xf] = 0
+		self.programcounter += 2
 
 	def _8XY5(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (self.v[(rawopcode & 0x0f00) >> 8] - self.v[(rawopcode & 0x00f0) >> 4]) & 0xff
-		if self.v[(rawopcode & 0x00f0) >> 4] > self.v[(rawopcode & 0x0f00) >> 8]:
-			self.v[0xf] = 0
-
-		else:
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		targetRegister = self.v[target]
+		sourceRegister = self.v[source]
+		if targetRegister > sourceRegister:
+			targetRegister -= sourceRegister 
 			self.v[0xf] = 1
+		else:
+			targetRegister = 256 + targetRegister - sourceRegister
+			self.v[0xf] = 0
+		self.v[target] = targetRegister
+		self.programcounter += 2
+
+	def _9XY0(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		target = (rawopcode & 0x00f0) >> 4
+
+		if self.v[source] != self.v[target]:
+			self.programcounter += 4
+		else:
+			self.programcounter += 2
 
 	def _ANNN(self, rawopcode):
-		self.i = (rawopcode & 0x0fff) & 0xffff
-		self.programcounter = self.programcounter + 2
+		self.i = (rawopcode & 0x0fff)
+		self.programcounter += 2
 
 	def _DXYN(self, rawopcode):
-		print(self.display.asString())
-		input("")
-		height = rawopcode & 0x000f
-		xcoordinate = self.v[(rawopcode & 0x0f00) >> 8] % 65
-		ycoordinate = self.v[(rawopcode & 0x00f0) >> 4] % 33
+		source = (rawopcode & 0x0f00) >> 8
+		target = (rawopcode & 0x00f0) >> 4
+		height = (rawopcode & 0x000f)
+		xcoordinate = (self.v[source] % 65)
+		ycoordinate = (self.v[target] % 33)
 		self.v[0xf] = 0
 		for yoffset in range(0, height):
-			sprite = self.memory[yoffset + self.i]
+			sprite = self.memory[yoffset + self.i] & 0xffff
 			for xoffset in range(0, 8):
 				bit = (sprite >> 7 - xoffset) & 1
 				xpixelpos = xcoordinate + xoffset
 				ypixelpos = ycoordinate + yoffset
 				bitfromscreen = self.display.getCoordinate(xpixelpos, ypixelpos)
-				if (bit ^ bitfromscreen) is True:
-					self.v[0xf] = 1
-				self.display.setCoordinate(xpixelpos, ypixelpos, bit ^ bitfromscreen)
-
-		self.programcounter = self.programcounter + 2
+				# if bitfromscreen == 1:
+				# 	self.v[0xf] = 1
+			self.display.setCoordinate(xpixelpos, ypixelpos, bit ^ bitfromscreen)
+			self.display.drawImage(xcoordinate, ycoordinate, rawopcode)
+		self.programcounter += 2
 
 	def _CXKK(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = (random.randint(0, 255)) & (rawopcode & 0x00ff) & 0xff
-		self.programcounter = self.programcounter + 2
+		target = (rawopcode & 0x0f00) >> 8
+		self.v[target] = ((random.randint(1,255)) & (rawopcode & 0x00ff))
 
 	def _F000(self, rawopcode):
 
@@ -195,20 +247,60 @@ class Emulator:
 		elif decodedopcode == 0xf007:
 			self._FX07(rawopcode)
 
+		elif decodedopcode == 0xf055:
+			self._FX55(rawopcode)
+
+		elif decodedopcode == 0xf033:
+			self._FX33(rawopcode)
+
+		elif decodedopcode == 0xf065:
+			self._FX65(rawopcode)
+
+		elif decodedopcode == 0xf029:
+			self._FX29(rawopcode)
+
 		else:
 			print("Unknown _F000 instruction " + hex(rawopcode))
 
 	def _FX1E(self, rawopcode):
-		self.i = (self.i + self.v[(rawopcode & 0x0f00) >> 8]) & 0xffff
-		self.programcounter = self.programcounter + 2
+		source = (rawopcode & 0x0f00) >> 8
+		self.i += self.v[source]
+		self.programcounter += 2
 
 	def _FX15(self, rawopcode):
-		self.delaytimer = self.v[(rawopcode & 0x0f00) >> 8] & 0xff
-		self.programcounter = self.programcounter + 2
+		source = (rawopcode & 0x0f00) >> 8
+		self.delaytimer = self.v[source]
+		self.programcounter += 2
 
 	def _FX07(self, rawopcode):
-		self.v[(rawopcode & 0x0f00) >> 8] = self.delaytimer & 0xff
-		self.programcounter = self.programcounter + 2
+		target = (rawopcode & 0x0f00) >> 8
+		self.v[target] = self.delaytimer
+		self.programcounter += 2
+
+	def _FX55(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		for x in range(0, source):
+			self.memory[self.i + x] = self.v[x]
+		self.programcounter += 2
+
+	def _FX33(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		vxdecimal = self.v[source]
+		self.memory[self.i] = int(vxdecimal/100)
+		self.memory[self.i + 1] = int((vxdecimal/10) % 10)
+		self.memory[self.i + 2] = int((vxdecimal%100) % 10)
+		self.programcounter += 2
+
+	def _FX65(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		for x in range(0, source):
+			self.v[x] = self.memory[self.i + x]
+		self.programcounter += 2
+
+	def _FX29(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		self.i = self.v[source] * 5
+		self.programcounter += 2
 
 	def _E000(self, rawopcode):
 		decodedopcode = (rawopcode & 0xf0ff)
@@ -221,20 +313,21 @@ class Emulator:
 			print("Unknown _E000 instruction " + hex(rawopcode))
 
 	def _EXA1(self, rawopcode):
-		if self.keyinput[self.v[(rawopcode & 0x0f00) >> 8]] is True:
-			self.programcounter = self.programcounter + 2
+		source = (rawopcode & 0x0f00) >> 8
+		if self.keyinput[self.v[source]] is False:
+			self.programcounter += 4
 		else:
-			self.programcounter = self.programcounter + 4
+			self.programcounter += 2
 
 	def _EX9E(self, rawopcode):
-		if self.keyinput[self.v[(rawopcode & 0x0f00) >> 8]] is True:
-			self.programcounter = self.programcounter + 4
+		source = (rawopcode & 0x0f00) >> 8
+		if self.keyinput[self.v[source]] is True:
+			self.programcounter += 4
 		else:
-			self.programcounter = self.programcounter + 2
+			self.programcounter += 2
 
 	def run_opcode(self, rawopcode):
 		decodedopcode = (rawopcode & 0xf000)
-		print("pc : " + hex(self.programcounter) + " executing rawopcode: " + hex(rawopcode) + " decodedopcode: " + hex(decodedopcode))
 
 		if decodedopcode == 0x0000:
 			self._0NNN(rawopcode)
@@ -252,13 +345,19 @@ class Emulator:
 			self._4XKK(rawopcode)
 
 		elif decodedopcode == 0x5000:
-			self._5NNN(rawopcode)
+			self._5XYO(rawopcode)
 
 		elif decodedopcode == 0x6000:
 			self._6XKK(rawopcode)
 
 		elif decodedopcode == 0x7000:
-			self._7XNN(rawopcode)
+			self._7XKK(rawopcode)
+
+		elif decodedopcode == 0x8000:
+			self._8XYN(rawopcode)
+
+		elif decodedopcode == 0x9000:
+			self._9XY0(rawopcode)
 
 		elif decodedopcode == 0xa000:
 			self._ANNN(rawopcode)
@@ -280,16 +379,18 @@ class Emulator:
 
 	def emulation_loop(self):
 		while True:
-			# input("entertorunprogram")
 			rawopcode = (self.memory[self.programcounter] << 8) | self.memory[self.programcounter + 1] # check opcode against programcounter
-			self.run_opcode(rawopcode)	
-			self.print_emulation_loop()
+			self.print_emulation_loop(rawopcode)
+			self.run_opcode(rawopcode)
+			if self.delaytimer > 0:
+				self.delaytimer = self.delaytimer - 1
+				time.sleep(1/60)
 
 		else:
 			sys.exit()
 
-	def print_emulation_loop(self):
-		print(" PC: " + str(hex(self.programcounter)) + " stack: " + str(self.stack) + " i: " + str(hex(self.i)) + "0:" + str(self.v))
+	def print_emulation_loop(self, rawopcode):
+		print(" PC: " + str(hex(self.programcounter)) + " stack: " + str(self.stack) + " i: " + str(hex(self.i)) + " registers:" + str(self.v) + " delaytimer: " + str(self.delaytimer) + " Vf: " + str(self.v[0xf]) + " rawopcode: " + str(hex(rawopcode)))
 
 
 
