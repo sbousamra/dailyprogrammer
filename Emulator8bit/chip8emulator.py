@@ -177,11 +177,10 @@ class Emulator:
 		source = (rawopcode & 0x00f0) >> 4
 		temporary = self.v[target] + self.v[source]
 		if temporary > 255:
-			self.v[target] = temporary - 256
 			self.v[0xf] = 1
 		else:
-			self.v[target] = temporary
 			self.v[0xf] = 0
+		self.v[target] = temporary - (temporary & 255)
 		self.programcounter += 2
 
 	def _8XY5(self, rawopcode):
@@ -190,12 +189,10 @@ class Emulator:
 		targetRegister = self.v[target]
 		sourceRegister = self.v[source]
 		if targetRegister > sourceRegister:
-			targetRegister -= sourceRegister 
 			self.v[0xf] = 1
 		else:
-			targetRegister = 256 + targetRegister - sourceRegister
 			self.v[0xf] = 0
-		self.v[target] = targetRegister
+		self.v[target] = self.v[source] - self.v[target]
 		self.programcounter += 2
 
 	def _9XY0(self, rawopcode):
