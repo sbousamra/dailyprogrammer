@@ -49,7 +49,6 @@ class Emulator:
 		while i < len(loadedrom):
 			self.memory[0x200 + i] = loadedrom[i] #put rom input into memory
 			i += 1
-		print(self.memory)
 
 	def _0NNN(self, rawopcode): #used to correctly identify which 0 opcode is being used
 		decodedopcode = (rawopcode & 0xf0ff)
@@ -152,19 +151,19 @@ class Emulator:
 	def _8XY1(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
 		source = (rawopcode & 0x00f0) >> 4
-		self.v[target] |= self.v[source]
+		self.v[target] = self.v[target] | self.v[source]
 		self.programcounter += 2
 
 	def _8XY2(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
 		source = (rawopcode & 0x00f0) >> 4
-		self.v[target] &= self.v[source]
+		self.v[target] = self.v[target] & self.v[source]
 		self.programcounter += 2
 
 	def _8XY3(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
 		source = (rawopcode & 0x00f0) >> 4
-		self.v[target] ^= self.v[source]
+		self.v[target] = self.v[target] ^ self.v[source]
 		self.programcounter += 2
 
 	def _8XY4(self, rawopcode):
@@ -175,7 +174,7 @@ class Emulator:
 			self.v[0xf] = 1
 		else:
 			self.v[0xf] = 0
-		self.v[target] = temporary & 0xff
+		self.v[target] = (self.v[target] + self.v[source]) & 0xff
 		self.programcounter += 2
 
 	def _8XY5(self, rawopcode):
@@ -187,8 +186,34 @@ class Emulator:
 			self.v[0xf] = 1
 		else:
 			self.v[0xf] = 0
-		self.v[target] -= self.v[source] & 0xff
+		self.v[target] = (self.v[target] - self.v[source]) & 0xff
 		self.programcounter += 2
+
+	def _8XY6(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		leastSignificantBit = self.v[source] & 1
+		self.v[0xf] = leastSignificantBit
+		self.v[source] = (self.v[source]/2)
+		self.programcounter += 2
+
+	def _8XY7(self, rawopcode):
+		target = (rawopcode & 0x0f00) >> 8
+		source = (rawopcode & 0x00f0) >> 4
+		targetRegister = self.v[target]
+		sourceRegister = self.v[source]
+		if sourceRegister > targetRegister:
+			self.v[0xf] = 1
+		else:
+			self.v[0xf] = 0
+		self.v[target] = (self.v[source] - self.v[target]) & 0xff
+
+	def _8XYE(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		mostSignificantBit = self.v[source] >> 7
+		self.v[0xf] = mostSignificantBit
+		self.v[source] = (self.v[source]*2)
+		self.programcounter += 2
+
 
 	def _9XY0(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
@@ -211,21 +236,21 @@ class Emulator:
 		ycoordinate = (self.v[target] % 33)
 		self.v[0xf] = 0
 		for yoffset in range(0, height):
-			sprite = self.memory[yoffset + self.i] & 0xffff
+			sprite = self.memory[yoffset + self.i]
 			for xoffset in range(0, 8):
-				bit = (sprite >> 7 - xoffset) & 1
-				xpixelpos = xcoordinate + xoffset
-				ypixelpos = ycoordinate + yoffset
-				bitfromscreen = self.display.getCoordinate(xpixelpos, ypixelpos)
-				# if bitfromscreen == 1:
-				# 	self.v[0xf] = 1
-			self.display.setCoordinate(xpixelpos, ypixelpos, bit ^ bitfromscreen)
-			self.display.drawImage(xcoordinate, ycoordinate, rawopcode)
+				if (sprite & (0x80 >> xoffset)) is not 0:
+					xpixelpos = xcoordinate + xoffset
+					ypixelpos = (ycoordinate + yoffset)
+					bitfromscreen = self.display.getCoordinate(xpixelpos, ypixelpos)
+					if bitfromscreen == 1:
+						self.v[0xf] = 1
+					self.display.setCoordinate(xpixelpos, ypixelpos, bitfromscreen ^ 1)
+					self.display.drawImage(xcoordinate, ycoordinate, rawopcode)
 		self.programcounter += 2
 
 	def _CXKK(self, rawopcode):
 		target = (rawopcode & 0x0f00) >> 8
-		self.v[target] = ((random.randint(1,255)) & (rawopcode & 0x00ff))
+		self.v[target] = ((random.randint(0,255)) & (rawopcode & 0x00ff))
 		self.programcounter += 2
 
 	def _F000(self, rawopcode):
@@ -252,12 +277,23 @@ class Emulator:
 		elif decodedopcode == 0xf029:
 			self._FX29(rawopcode)
 
+		elif decodedopcode == 0xf018:
+			self._FX18(rawopcode)
+
+		elif decodedopcode == 0xf00a:
+			self._FX0A(rawopcode)
+
 		else:
 			print("Unknown _F000 instruction " + hex(rawopcode))
 
 	def _FX1E(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
-		self.i += self.v[source] & 0xffff
+		sourceRegister = self.v[source]
+		if (sourceRegister + self.i) > 0xfff:
+			self.v[0xf] = 1
+		else:
+			self.v[0xf] = 0
+		self.i = (self.i + self.v[source]) & 0xffff
 		self.programcounter += 2
 
 	def _FX15(self, rawopcode):
@@ -295,6 +331,11 @@ class Emulator:
 		self.i = self.v[source] * 5
 		self.programcounter += 2
 
+	def _FX18(self, rawopcode):
+		source = (rawopcode & 0x0f00) >> 8
+		self.soundtimer = self.v[source]
+		self.programcounter += 2
+
 	def _E000(self, rawopcode):
 		decodedopcode = (rawopcode & 0xf0ff)
 		if decodedopcode == 0xe0a1:
@@ -307,14 +348,14 @@ class Emulator:
 
 	def _EXA1(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
-		if self.keyinput[self.v[source]] is False:
+		if self.keyinput[self.v[source]] is 0:
 			self.programcounter += 4
 		else:
 			self.programcounter += 2
 
 	def _EX9E(self, rawopcode):
 		source = (rawopcode & 0x0f00) >> 8
-		if self.keyinput[self.v[source]] is True:
+		if self.keyinput[self.v[source]] is not 0:
 			self.programcounter += 4
 		else:
 			self.programcounter += 2
