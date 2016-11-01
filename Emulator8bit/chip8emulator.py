@@ -2,6 +2,7 @@ import sys
 import random
 import time
 import pygame
+pygame.init()
 
 class Screen:
 	def __init__(self, color, width, height, scalingFactor):
@@ -43,7 +44,7 @@ class Emulator:
 		self.i = 0
 
 	def load_rom(self):
-		loadedrom = open("TETRIS", "rb").read() #take in input from rom
+		loadedrom = open("TANK", "rb").read() #take in input from rom
 		
 		i = 0
 		while i < len(loadedrom):
@@ -412,7 +413,8 @@ class Emulator:
 			raise Exception("Unknown Opcode: " + hex(rawopcode))
 
 	def emulation_loop(self):
-		while True:
+		exit = False
+		while exit is False:
 			rawopcode = (self.memory[self.programcounter] << 8) | self.memory[self.programcounter + 1] # check opcode against programcounter
 			self.print_emulation_loop(rawopcode)
 			self.run_opcode(rawopcode)
@@ -420,8 +422,9 @@ class Emulator:
 				self.delaytimer = self.delaytimer - 1
 				time.sleep(1/60)
 
-		else:
-			sys.exit()
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
+					exit = True
 
 	def print_emulation_loop(self, rawopcode):
 		print(" PC: " + str(hex(self.programcounter)) + " stack: " + str(self.stack) + " i: " + str(hex(self.i)) + " registers:" + str(self.v) + " delaytimer: " + str(self.delaytimer) + " Vf: " + str(self.v[0xf]) + " rawopcode: " + str(hex(rawopcode)))
@@ -431,3 +434,4 @@ class Emulator:
 runemulator = Emulator()
 runemulator.load_rom()
 runemulator.emulation_loop()
+pygame.quit()

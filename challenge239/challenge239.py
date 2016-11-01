@@ -28,11 +28,8 @@ def reducingNumber(number):
     else:
         reducingNumber(newNumber)
 
-fname = "input239.txt"
-with open(fname) as file:
-    bass=file.read().splitlines()
-    for line in bass:
-        reducingNumber(int(line))
+number = input("input your number: ")
+reducingNumber(int(number))
 
 
 

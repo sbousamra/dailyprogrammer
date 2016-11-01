@@ -1,27 +1,27 @@
 import time
 import sys
 import pygame
-
-tamagotchihappy = pygame.image.load("tamagotchihappy.gif")
-tamagotchihappyrect = tamagotchihappy.get_rect()
-tamagotchinormal = pygame.image.load("tamagotchinormal.gif")
-tamagotchinormalrect = tamagotchinormal.get_rect()
-tamagotchiunhappy = pygame.image.load("tamagotchiunhappy.gif")
-tamagotchiunhappyrect = tamagotchiunhappy.get_rect()
-tamagotchipooptold = pygame.image.load("tamagotchipooptold.gif")
-tamagotchipooptoldrect = tamagotchipooptold.get_rect()
-tamagotchipoopself = pygame.image.load("tamagotchipoopself.gif")
-tamagotchipoopselfrect = tamagotchipoopself.get_rect()
-tamagotchihungry = pygame.image.load("tamagotchihungry.gif")
-tamagotchihungryrect = tamagotchihungry.get_rect()
-tamagotchistarving = pygame.image.load("tamagotchistarving.gif")
-tamagotchistarvingrect = tamagotchistarving.get_rect()
-tamagotchitired = pygame.image.load("tamagotchitired.gif")
-tamagotchitiredrect = tamagotchitired.get_rect()
-tamagotchifellasleep = pygame.image.load("tamagotchifellasleep.gif")
-tamagotchifellasleeprect = tamagotchifellasleep.get_rect()
-tamagotchidead = pygame.image.load("tamagotchidead.gif")
-tamagotchideadrect = tamagotchidead.get_rect()
+pygame.init()
+# tamagotchihappy = pygame.image.load("tamagotchihappy.gif")
+# tamagotchihappyrect = tamagotchihappy.get_rect()
+# tamagotchinormal = pygame.image.load("tamagotchinormal.gif")
+# tamagotchinormalrect = tamagotchinormal.get_rect()
+# tamagotchiunhappy = pygame.image.load("tamagotchiunhappy.gif")
+# tamagotchiunhappyrect = tamagotchiunhappy.get_rect()
+# tamagotchipooptold = pygame.image.load("tamagotchipooptold.gif")
+# tamagotchipooptoldrect = tamagotchipooptold.get_rect()
+# tamagotchipoopself = pygame.image.load("tamagotchipoopself.gif")
+# tamagotchipoopselfrect = tamagotchipoopself.get_rect()
+# tamagotchihungry = pygame.image.load("tamagotchihungry.gif")
+# tamagotchihungryrect = tamagotchihungry.get_rect()
+# tamagotchistarving = pygame.image.load("tamagotchistarving.gif")
+# tamagotchistarvingrect = tamagotchistarving.get_rect()
+# tamagotchitired = pygame.image.load("tamagotchitired.gif")
+# tamagotchitiredrect = tamagotchitired.get_rect()
+# tamagotchifellasleep = pygame.image.load("tamagotchifellasleep.gif")
+# tamagotchifellasleeprect = tamagotchifellasleep.get_rect()
+# tamagotchidead = pygame.image.load("tamagotchidead.gif")
+# tamagotchideadrect = tamagotchidead.get_rect()
 
 class Tamagotchi:
 	def __init__(self, name):
@@ -71,7 +71,6 @@ class Tamagotchi:
 
 class Buttons:
 	def __init__(self, tamagotchi):
-		pygame.init()
 		self.tamagotchi = tamagotchi
 		self.size = width, height = 640, 480
 		self.black = (0,0,0)
@@ -121,7 +120,6 @@ class Game:
 			self.tamagotchi.tick()
 			currentImage = pygame.transform.scale(pygame.image.load(self.tamagotchi.getGraphics()), self.buttons.size)
 			currentImageRec = currentImage.get_rect()
-			clock = pygame.time.Clock.tick
 			self.buttons.screen.fill(self.buttons.black)
 			self.buttons.screen.blit(currentImage, currentImageRec)
 			time.sleep(1)
